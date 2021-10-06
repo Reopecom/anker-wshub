@@ -26,7 +26,6 @@ func status(subscription *Subscription) func(w http.ResponseWriter, r *http.Requ
 	return func(w http.ResponseWriter, r *http.Request) {
 		data, _ := json.Marshal(subscription.Status())
 		w.Header().Set("content-type", "application/json")
-		log.Println(data)
 		_, _ = w.Write(data)
 	}
 }
