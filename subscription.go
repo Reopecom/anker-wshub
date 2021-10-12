@@ -87,3 +87,18 @@ func (ps *Subscription) Status() interface{} {
 	return data
 
 }
+
+func (ps *Subscription) RemoveClient(client *Client) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	for topic, c := range ps.subscribers {
+		for i, client_ := range c {
+			if client_ == client {
+				ps.subscribers[topic][i] = ps.subscribers[topic][len(ps.subscribers[topic])-1]
+				ps.subscribers[topic] = ps.subscribers[topic][:len(ps.subscribers[topic])-1]
+			}
+		}
+	}
+
+}

@@ -10,7 +10,6 @@ import (
 var addr = flag.String("addr", ":9200", "http service address")
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL)
 	if r.URL.Path != "/" {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
@@ -38,6 +37,7 @@ func main() {
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(subscription, w, r)
 	})
+	log.Printf("starting server on port %s ...\n", *addr)
 	err := http.ListenAndServe(*addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)

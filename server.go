@@ -37,12 +37,12 @@ type Client struct {
 	send chan []byte
 }
 
-type PubOrSub string
+type PubOrSub int8
 
 const (
-	pub   PubOrSub = "publish"
-	sub   PubOrSub = "subscribe"
-	unsub PubOrSub = "unsubscribe"
+	unsub PubOrSub = iota - 1
+	pub
+	sub
 )
 
 type message struct {
@@ -71,9 +71,13 @@ func (c *Client) readPump() {
 		err := c.conn.ReadJSON(&wsMsg)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+				log.Printf("closed unexpectedly error: %v", err)
 			}
-			log.Println("error reading")
+			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("closed client gracefully")
+			}
+			log.Println("removing client")
+			c.subscription.RemoveClient(c)
 			break
 		}
 		switch wsMsg.Action {

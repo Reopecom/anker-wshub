@@ -15,15 +15,14 @@
     </table>
     <script>
         async function getStatus(){
-            const res = await fetch("http://localhost:9200/status");
+            const res = await fetch("/status");
             const data = await res.json();
             return data ? Object.entries(data).map(([k,v])=>  ({topic: k, subscribers : v})): [];
         }
 
         setInterval(()=>{
            getStatus().then(x=> {
-               console.log(x);
-               document.getElementById("subs").innerHTML =""
+               document.getElementById("subs").innerHTML = ""
                x.map((y)=> {
                     const row = document.createElement("tr");
                     const topic = document.createElement("td");
