@@ -16,9 +16,6 @@ const (
 
 	// Send pings to peer with this period. Must be less than pongWait.
 	pingPeriod = (pongWait * 9) / 10
-
-	// Maximum message size allowed from peer.
-	maxMessageSize = 512
 )
 
 var upgrader = websocket.Upgrader{
@@ -60,7 +57,6 @@ func (c *Client) readPump() {
 	defer func() {
 		_ = c.conn.Close()
 	}()
-	c.conn.SetReadLimit(maxMessageSize)
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -71,26 +67,32 @@ func (c *Client) readPump() {
 		err := c.conn.ReadJSON(&wsMsg)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("closed unexpectedly error: %v", err)
+				log.Printf("closed unexpectedly error: %v\n", err)
+				log.Println("removing client")
+
+				c.subscription.RemoveClient(c)
 			}
+
 			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("closed client gracefully")
+				log.Printf("closed client gracefully %s\n", err)
+				log.Println("removing client")
+
+				c.subscription.RemoveClient(c)
 			}
-			log.Println("removing client")
-			c.subscription.RemoveClient(c)
+			log.Printf("read error: %v\n", err)
 			break
 		}
 		switch wsMsg.Action {
 		case sub:
-			log.Println("subscribing")
+			log.Printf("subscribing - %s \n", wsMsg.Topic)
 			c.subscription.Subscribe(wsMsg.Topic, c)
 			break
 		case pub:
-			log.Println("publishing")
+			log.Printf("publishing - %s \n", wsMsg.Topic)
 			c.subscription.Publish(wsMsg.Topic, wsMsg)
 			break
 		case unsub:
-			log.Println("unsubscribing")
+			log.Printf("unsubscribing - %s \n", wsMsg.Topic)
 			c.subscription.UnSubscribe(wsMsg.Topic, c)
 			break
 		default:
