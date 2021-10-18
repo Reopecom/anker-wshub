@@ -26,12 +26,8 @@ var upgrader = websocket.Upgrader{
 // Client is a middleman between the websocket connection and the subscription.
 type Client struct {
 	subscription *Subscription
-
-	// The websocket connection.
-	conn *websocket.Conn
-
-	// Buffered channel of outbound messages.
-	send chan []byte
+	conn         *websocket.Conn
+	send         chan []byte
 }
 
 type PubOrSub int8
@@ -66,20 +62,23 @@ func (c *Client) readPump() {
 		var wsMsg message
 		err := c.conn.ReadJSON(&wsMsg)
 		if err != nil {
+			isClose := false
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("closed unexpectedly error: %v\n", err)
 				log.Println("removing client")
-
+				isClose = true
 				c.subscription.RemoveClient(c)
 			}
 
 			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("closed client gracefully %s\n", err)
 				log.Println("removing client")
-
+				isClose = true
 				c.subscription.RemoveClient(c)
 			}
-			log.Printf("read error: %v\n", err)
+			if !isClose {
+				log.Printf("read error: %v\n", err)
+			}
 			break
 		}
 		switch wsMsg.Action {
@@ -130,7 +129,7 @@ func (c *Client) writePump() {
 			}
 			_, _ = w.Write(msg)
 
-			// Add queued chat messages to the current websocket message.
+			// Add queued messages to the current websocket message.
 			n := len(c.send)
 			for i := 0; i < n; i++ {
 				_, _ = w.Write(<-c.send)
