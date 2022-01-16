@@ -110,6 +110,7 @@ func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
+		c.subscription.RemoveClient(c)
 		_ = c.conn.Close()
 	}()
 	for {
