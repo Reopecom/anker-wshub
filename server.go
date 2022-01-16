@@ -62,22 +62,10 @@ func (c *Client) readPump() {
 		var wsMsg message
 		err := c.conn.ReadJSON(&wsMsg)
 		if err != nil {
-			isClose := false
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("closed unexpectedly error: %v\n", err)
+			if websocket.IsUnexpectedCloseError(err) {
+				log.Printf("closed client error: %v\n", err)
 				log.Println("removing client")
-				isClose = true
 				c.subscription.RemoveClient(c)
-			}
-
-			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("closed client gracefully %s\n", err)
-				log.Println("removing client")
-				isClose = true
-				c.subscription.RemoveClient(c)
-			}
-			if !isClose {
-				log.Printf("read error: %v\n", err)
 			}
 			break
 		}
