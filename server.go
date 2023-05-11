@@ -21,13 +21,16 @@ const (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 // Client is a middleman between the websocket connection and the subscription.
 type Client struct {
-	subscription *Subscription
-	conn         *websocket.Conn
-	send         chan []byte
+	name string
+	conn *websocket.Conn
+	send chan []byte
 }
 
 type PubOrSub int8
@@ -49,7 +52,7 @@ type message struct {
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
-func (c *Client) readPump() {
+func (c *Client) readPump(s *Subscription) {
 	defer func() {
 		_ = c.conn.Close()
 	}()
@@ -62,28 +65,33 @@ func (c *Client) readPump() {
 		var wsMsg message
 		err := c.conn.ReadJSON(&wsMsg)
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err) {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseMessage, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
 				log.Printf("closed client error: %v\n", err)
-				log.Println("removing client")
-				c.subscription.RemoveClient(c)
+				s.RemoveClient(c)
+				break
 			}
-			break
+			if websocket.IsCloseError(err, websocket.CloseMessage, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+				log.Printf("%s> leaving\n", c.name)
+				s.RemoveClient(c)
+				break
+			}
+			log.Printf("%s> error reading message: %v\n", c.name, err)
 		}
 		switch wsMsg.Action {
 		case sub:
-			log.Printf("subscribing - %s \n", wsMsg.Topic)
-			c.subscription.Subscribe(wsMsg.Topic, c)
+			log.Printf("%s> subscribing - %s \n", c.name, wsMsg.Topic)
+			s.Subscribe(wsMsg.Topic, c)
 			break
 		case pub:
-			log.Printf("publishing - %s \n", wsMsg.Topic)
-			c.subscription.Publish(wsMsg.Topic, wsMsg)
+			log.Printf("%s> publishing - %s \n", c.name, wsMsg.Topic)
+			s.Publish(wsMsg.Topic, wsMsg)
 			break
 		case unsub:
-			log.Printf("unsubscribing - %s \n", wsMsg.Topic)
-			c.subscription.UnSubscribe(wsMsg.Topic, c)
+			log.Printf("%s> unsubscribing - %s \n", c.name, wsMsg.Topic)
+			s.UnSubscribe(wsMsg.Topic, c)
 			break
 		default:
-			log.Printf("unknown action %s\n", wsMsg.Topic)
+			log.Printf("%s> unknown action %s\n", c.name, wsMsg.Topic)
 			break
 		}
 	}
@@ -94,11 +102,11 @@ func (c *Client) readPump() {
 // A goroutine running writePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *Client) writePump() {
+func (c *Client) writePump(s *Subscription) {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.subscription.RemoveClient(c)
+		s.RemoveClient(c)
 		_ = c.conn.Close()
 	}()
 	for {
@@ -141,16 +149,21 @@ func (c *Client) writePump() {
 
 // serveWs handles websocket requests from the peer.
 func serveWs(subscription *Subscription, w http.ResponseWriter, r *http.Request) {
-	log.Println("new client")
+	defer log.Println("new client ", r.URL.Query().Get("client-name"))
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	client := &Client{subscription: subscription, conn: conn, send: make(chan []byte, 256)}
+	client := &Client{
+		name: r.URL.Query().Get("client-name"),
+		conn: conn,
+		send: make(chan []byte, 256),
+	}
 
 	// Allow collection of memory referenced by the caller by doing all work in
 	// new goroutines.
-	go client.writePump()
-	go client.readPump()
+	r.Header.Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+	go client.writePump(subscription)
+	go client.readPump(subscription)
 }
