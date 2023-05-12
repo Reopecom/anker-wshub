@@ -13,11 +13,11 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-		    VALUE "CompanyName", "Reope AS"
-            VALUE "FileDescription", "Websocket Message broker for Anker"
+		    VALUE "CompanyName", "AnkerDB AS"
+            VALUE "FileDescription", "Desktop Connector for Anker"
             VALUE "FileVersion", "1.0.0.0"
             VALUE "InternalName", "wshub"
-            VALUE "LegalCopyright", "Anker © Reope AS"
+            VALUE "LegalCopyright", "Ankerdb AS ©"
             VALUE "OriginalFilename", "wshub.exe"
             VALUE "ProductName", "Anker"
 			VALUE "ProductVersion", "1.0.0.0"
