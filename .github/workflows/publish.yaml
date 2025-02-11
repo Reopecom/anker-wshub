@@ -20,12 +20,28 @@ jobs:
       - name: Build Go executable
         run: go build -o wspubsubgo.exe
 
-      - name: Create Release
-        id: create_release
+      - name: Create Release Draft
         uses: ncipollo/release-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: ${{ github.event.head_commit.message }}
+          draft: true
           artifacts: wspubsubgo.exe
+
+      - name: Release Draft
+        uses: ncipollo/release-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag: ${{ github.ref_name }}
+          draft: false
+          updateOnlyUnreleased: true
+          allowUpdates: true
+          omitBodyDuringUpdate: true
+          omitNameDuringUpdate: true
+          makeLatest: true
+
 
